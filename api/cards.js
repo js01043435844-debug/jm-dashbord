@@ -1,6 +1,21 @@
 import { put, list } from '@vercel/blob';
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 const PATHNAME = 'jm-dashboard-cards.json';
+
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
@@ -18,8 +33,8 @@ export default async function handler(req, res) {
         res.status(200).json(null);
         return;
       }
-      const data = await fileRes.json();
-      res.status(200).json(data);
+      const text = await fileRes.text();
+      res.status(200).setHeader('Content-Type', 'application/json; charset=utf-8').send(text);
     } catch (err) {
       res.status(200).json(null);
     }
@@ -28,9 +43,11 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      await put(PATHNAME, JSON.stringify(req.body), {
+      const raw = await readRawBody(req);
+      const body = JSON.parse(raw);
+      await put(PATHNAME, JSON.stringify(body), {
         access: 'private',
-        contentType: 'application/json',
+        contentType: 'application/json; charset=utf-8',
         addRandomSuffix: false,
         allowOverwrite: true,
       });
