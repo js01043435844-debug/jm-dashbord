@@ -51,6 +51,10 @@ function formatDateTime(ts) {
 export default function Dashboard() {
   const [cards, setCards] = useState(DEFAULT_CARDS);
   const [loaded, setLoaded] = useState(false);
+  const [needsAuth, setNeedsAuth] = useState(false);
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('person');
@@ -59,34 +63,65 @@ export default function Dashboard() {
   const [editingName, setEditingName] = useState('');
   const saveTimer = useRef(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/cards');
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setCards(data);
-        } else {
-          // 서버에 아직 데이터가 없으면, 이 브라우저에 남아있던 이전 로컬 데이터를 최초 시드로 사용
-          let seed = DEFAULT_CARDS;
-          try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (raw) seed = JSON.parse(raw);
-          } catch (e) {
-            // 무시
-          }
-          setCards(seed);
-        }
-      } catch (e) {
-        // 네트워크 실패 시 기본값 유지
-      } finally {
-        setLoaded(true);
+  async function loadCards() {
+    try {
+      const res = await fetch('/api/cards');
+      if (res.status === 401) {
+        setNeedsAuth(true);
+        return;
       }
-    })();
-  }, []);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setCards(data);
+      } else {
+        // 서버에 아직 데이터가 없으면, 이 브라우저에 남아있던 이전 로컬 데이터를 최초 시드로 사용
+        let seed = DEFAULT_CARDS;
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) seed = JSON.parse(raw);
+        } catch (e) {
+          // 무시
+        }
+        setCards(seed);
+      }
+      setNeedsAuth(false);
+    } catch (e) {
+      // 네트워크 실패 시 기본값 유지
+    } finally {
+      setLoaded(true);
+    }
+  }
 
   useEffect(() => {
-    if (!loaded) return;
+    loadCards();
+  }, []);
+
+  async function handleLogin() {
+    setAuthError('');
+    setLoggingIn(true);
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        setPassword('');
+        setLoaded(false);
+        await loadCards();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setAuthError(data.error || '로그인에 실패했습니다');
+      }
+    } catch (e) {
+      setAuthError('네트워크 오류가 발생했습니다');
+    } finally {
+      setLoggingIn(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!loaded || needsAuth) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
@@ -136,6 +171,39 @@ export default function Dashboard() {
       setCards(cards.map((c) => (c.id === cardId ? { ...c, name: editingName.trim() } : c)));
     }
     setEditingId(null);
+  }
+
+  if (needsAuth) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#1C1F22', color: '#F2EFE9', fontFamily: "'Noto Sans KR', sans-serif" }} className="flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#262A2E', border: '1px solid #34393E' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Flame size={20} style={{ color: '#D6402C' }} />
+            <span className="text-xs tracking-widest" style={{ color: '#9AA0A6' }}>JM시스템즈</span>
+          </div>
+          <h1 className="brand-font text-xl mb-4" style={{ color: '#F2EFE9' }}>비밀번호를 입력하세요</h1>
+          <input
+            autoFocus
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+            placeholder="공유 비밀번호"
+            className="w-full px-3 py-2.5 rounded-lg text-sm outline-none mb-3"
+            style={{ background: '#1C1F22', border: '1px solid #3A3F44', color: '#F2EFE9' }}
+          />
+          {authError && <p className="text-xs mb-3" style={{ color: '#D6402C' }}>{authError}</p>}
+          <button
+            onClick={handleLogin}
+            disabled={loggingIn}
+            className="w-full py-2.5 rounded-lg text-sm font-medium"
+            style={{ background: '#D6402C', color: '#fff', opacity: loggingIn ? 0.6 : 1 }}
+          >
+            {loggingIn ? '확인 중...' : '입장'}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

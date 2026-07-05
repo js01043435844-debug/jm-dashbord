@@ -1,4 +1,5 @@
 import { put, list } from '@vercel/blob';
+import { readRawBody, isAuthed } from './_lib.js';
 
 export const config = {
   api: {
@@ -8,16 +9,12 @@ export const config = {
 
 const PATHNAME = 'jm-dashboard-cards.json';
 
-function readRawBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    req.on('error', reject);
-  });
-}
-
 export default async function handler(req, res) {
+  if (!isAuthed(req)) {
+    res.status(401).json({ error: 'unauthorized' });
+    return;
+  }
+
   if (req.method === 'GET') {
     try {
       const { blobs } = await list({ prefix: PATHNAME });
