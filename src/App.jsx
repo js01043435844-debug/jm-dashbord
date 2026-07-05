@@ -41,6 +41,13 @@ function gaugeArc(cx, cy, r, a1, a2) {
   return `M ${p1.x} ${p1.y} A ${r} ${r} 0 0 1 ${p2.x} ${p2.y}`;
 }
 
+function formatDateTime(ts) {
+  if (!ts) return null;
+  const d = new Date(ts);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function loadCards() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -93,11 +100,11 @@ export default function Dashboard() {
   function addTodo(cardId) {
     const text = (inputs[cardId] || '').trim();
     if (!text) return;
-    setCards(cards.map((c) => (c.id === cardId ? { ...c, todos: [...c.todos, { id: uid(), text, done: false }] } : c)));
+    setCards(cards.map((c) => (c.id === cardId ? { ...c, todos: [...c.todos, { id: uid(), text, done: false, createdAt: Date.now(), doneAt: null }] } : c)));
     setInputs({ ...inputs, [cardId]: '' });
   }
   function toggleTodo(cardId, todoId) {
-    setCards(cards.map((c) => (c.id === cardId ? { ...c, todos: c.todos.map((t) => (t.id === todoId ? { ...t, done: !t.done } : t)) } : c)));
+    setCards(cards.map((c) => (c.id === cardId ? { ...c, todos: c.todos.map((t) => (t.id === todoId ? { ...t, done: !t.done, doneAt: !t.done ? Date.now() : null } : t)) } : c)));
   }
   function deleteTodo(cardId, todoId) {
     setCards(cards.map((c) => (c.id === cardId ? { ...c, todos: c.todos.filter((t) => t.id !== todoId) } : c)));
@@ -241,18 +248,26 @@ export default function Dashboard() {
                   <p className="text-xs py-2" style={{ color: '#6B7176' }}>할 일이 없습니다</p>
                 )}
                 {card.todos.map((todo) => (
-                  <div key={todo.id} className="flex items-center gap-2 group">
+                  <div key={todo.id} className="flex items-start gap-2 group">
                     <button
                       onClick={() => toggleTodo(card.id, todo.id)}
-                      className="w-4 h-4 rounded shrink-0 flex items-center justify-center"
+                      className="w-4 h-4 mt-0.5 rounded shrink-0 flex items-center justify-center"
                       style={{ border: `1.5px solid ${todo.done ? '#3FA34D' : '#5A5F64'}`, background: todo.done ? '#3FA34D' : 'transparent' }}
                     >
                       {todo.done && <span style={{ color: '#fff', fontSize: 10, lineHeight: 1 }}>✓</span>}
                     </button>
-                    <span className="text-xs flex-1" style={{ color: todo.done ? '#6B7176' : '#E4E1DB', textDecoration: todo.done ? 'line-through' : 'none' }}>
-                      {todo.text}
-                    </span>
-                    <button onClick={() => deleteTodo(card.id, todo.id)} className="opacity-0 group-hover:opacity-100" style={{ color: '#6B7176' }}>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs block" style={{ color: todo.done ? '#6B7176' : '#E4E1DB', textDecoration: todo.done ? 'line-through' : 'none' }}>
+                        {todo.text}
+                      </span>
+                      {(todo.createdAt || todo.doneAt) && (
+                        <span className="text-[10px] block" style={{ color: '#5A5F64' }}>
+                          {todo.createdAt && `입력 ${formatDateTime(todo.createdAt)}`}
+                          {todo.done && todo.doneAt && ` · 완료 ${formatDateTime(todo.doneAt)}`}
+                        </span>
+                      )}
+                    </div>
+                    <button onClick={() => deleteTodo(card.id, todo.id)} className="opacity-0 group-hover:opacity-100 mt-0.5" style={{ color: '#6B7176' }}>
                       <X size={12} />
                     </button>
                   </div>
