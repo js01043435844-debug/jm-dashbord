@@ -48,18 +48,9 @@ function formatDateTime(ts) {
   return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function loadCards() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    // 저장된 데이터 없음 - 기본값 사용
-  }
-  return DEFAULT_CARDS;
-}
-
 export default function Dashboard() {
-  const [cards, setCards] = useState(loadCards);
+  const [cards, setCards] = useState(DEFAULT_CARDS);
+  const [loaded, setLoaded] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('person');
@@ -69,16 +60,47 @@ export default function Dashboard() {
   const saveTimer = useRef(null);
 
   useEffect(() => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
+    (async () => {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+        const res = await fetch('/api/cards');
+        const data = await res.json();
+        if (data) {
+          setCards(data);
+        } else {
+          // 서버에 아직 데이터가 없으면, 이 브라우저에 남아있던 이전 로컬 데이터를 최초 시드로 사용
+          let seed = DEFAULT_CARDS;
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) seed = JSON.parse(raw);
+          } catch (e) {
+            // 무시
+          }
+          setCards(seed);
+        }
+      } catch (e) {
+        // 네트워크 실패 시 기본값 유지
+      } finally {
+        setLoaded(true);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await fetch('/api/cards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cards),
+        });
       } catch (e) {
         console.error('저장 실패', e);
       }
     }, 400);
     return () => clearTimeout(saveTimer.current);
-  }, [cards]);
+  }, [cards, loaded]);
 
   const totalTodos = cards.reduce((s, c) => s + c.todos.length, 0);
   const doneTodos = cards.reduce((s, c) => s + c.todos.filter((t) => t.done).length, 0);
