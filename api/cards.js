@@ -11,7 +11,9 @@ export default async function handler(req, res) {
         res.status(200).json(null);
         return;
       }
-      const fileRes = await fetch(found.url);
+      const fileRes = await fetch(found.url, {
+        headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
+      });
       if (!fileRes.ok) {
         res.status(200).json(null);
         return;
@@ -27,7 +29,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       await put(PATHNAME, JSON.stringify(req.body), {
-        access: 'public',
+        access: 'private',
         contentType: 'application/json',
         addRandomSuffix: false,
         allowOverwrite: true,
