@@ -3,8 +3,8 @@ import { put, list } from '@vercel/blob';
 const PATHNAME = 'jm-dashboard-cards.json';
 
 export default async function handler(req, res) {
-  try {
-    if (req.method === 'GET') {
+  if (req.method === 'GET') {
+    try {
       const { blobs } = await list({ prefix: PATHNAME });
       const found = blobs.find((b) => b.pathname === PATHNAME);
       if (!found) {
@@ -12,12 +12,20 @@ export default async function handler(req, res) {
         return;
       }
       const fileRes = await fetch(found.url);
+      if (!fileRes.ok) {
+        res.status(200).json(null);
+        return;
+      }
       const data = await fileRes.json();
       res.status(200).json(data);
-      return;
+    } catch (err) {
+      res.status(200).json(null);
     }
+    return;
+  }
 
-    if (req.method === 'POST') {
+  if (req.method === 'POST') {
+    try {
       await put(PATHNAME, JSON.stringify(req.body), {
         access: 'public',
         contentType: 'application/json',
@@ -25,11 +33,11 @@ export default async function handler(req, res) {
         allowOverwrite: true,
       });
       res.status(200).json({ ok: true });
-      return;
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
     }
-
-    res.status(405).json({ error: 'Method not allowed' });
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return;
   }
+
+  res.status(405).json({ error: 'Method not allowed' });
 }

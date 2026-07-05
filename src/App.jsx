@@ -64,7 +64,7 @@ export default function Dashboard() {
       try {
         const res = await fetch('/api/cards');
         const data = await res.json();
-        if (data) {
+        if (Array.isArray(data)) {
           setCards(data);
         } else {
           // 서버에 아직 데이터가 없으면, 이 브라우저에 남아있던 이전 로컬 데이터를 최초 시드로 사용
